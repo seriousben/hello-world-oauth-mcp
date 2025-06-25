@@ -8,11 +8,11 @@
 
 ## 🔧 What This Thing Does
 
-This MCP server showcases OAuth 2.0 integration using dynamic client registration. It's like a handshake between computers, but with more security and fewer germy palms.
+This MCP server showcases OAuth 2.0 integration with built-in OAuth support and dual MCP specification compatibility. It's like a handshake between computers, but with more security and fewer germy palms.
 
 **Primary Functions:**
-- Demonstrates OAuth 2.0 authorization flows
-- Implements dynamic client registration
+- Demonstrates OAuth 2.0 authorization flows with **dual MCP spec support**
+- Implements JWT token validation with proper `www-authenticate` headers
 - Provides MCP server capabilities for AI assistants
 - Serves as a learning reference for OAuth + MCP integration
 
@@ -42,7 +42,7 @@ npm install
 
 ### Step 4: Start the MCP Server
 ```bash
-npm run dev
+npm run server
 ```
 *WHIRRING SOUNDS* - Server should now be operational on port 4111.
 
@@ -54,52 +54,20 @@ This will execute a test client to verify OAuth flows are functioning within acc
 
 **Expected Output:**
 ```bash
-npm run client                                                                             1045ms
+npm run server
 
-> hello-world-oauth-mcp@1.0.0 client
-> tsx ./src/client/client.ts
+🚀 Hello World OAuth MCP Server is running!
 
-🚀 Starting OAuth authentication flow...
-🔍 Discovered OAuth endpoints: {
-  issuer: 'http://auth-server.example.com',
-  authorization_endpoint: 'http://auth-server.example.com/oauth/2/authorize',
-  token_endpoint: 'http://auth-server.example.com/token',
-  jwks_uri: 'http://auth-server.example.com/openidconnect/jwks',
-  response_types_supported: [ 'code' ],
-  grant_types_supported: [ 'authorization_code' ],
-  code_challenge_methods_supported: [ 'S256', 'plain' ],
-  scopes_supported: [ 'mcp' ],
-  token_endpoint_auth_methods_supported: [ 'none' ],
-  response_modes_supported: [ 'query', 'fragment' ],
-  subject_types_supported: [ 'public' ],
-  token_endpoint_auth_signing_alg_values_supported: [ 'RS256' ],
-  id_token_signing_alg_values_supported: [ 'RS256' ],
-  registration_endpoint: 'http://auth-server.example.com/oauth/2/register/clients'
-}
-📝 Registering OAuth client...
-✅ Client registered successfully: {
-  client_id: '01234567-89ab-cdef-0123-456789abcdef',
-  client_name: 'My Dynamic MCP Client',
-  redirect_uris: [ 'http://localhost:7080/callback' ],
-  grant_types: [ 'authorization_code' ],
-  response_types: [ 'code' ],
-  token_endpoint_auth_method: 'none'
-}
-📖 Opening browser for authorization...
-🔗 Callback server started on http://localhost:7080
-🎫 Access token obtained successfully
-🔌 Connected to MCP server with authentication
-✅ Authentication and connection complete!
-🔧 Calling tool: helloWorldServer_helloTool with args: { name: 'Alice' }
-✨ Tool result: {
-  content: [
-    {
-      type: 'text',
-      text: 'Hello Alice! (From: OAuth Demo Server | Client: example-client | Audience: https://api.example.com)'
-    }
-  ],
-  isError: false
-}
+Endpoints:
+- MCP (HTTP Stream): http://localhost:4111/mcp
+- MCP (SSE): http://localhost:4111/sse
+- Health: http://localhost:4111/health
+- OAuth Authorization Server (2025-03-26): http://localhost:4111/.well-known/oauth-authorization-server
+- OAuth Protected Resource (2025-06-18): http://localhost:4111/.well-known/oauth-protected-resource
+
+The server supports both MCP specification versions:
+- 2025-03-26 (legacy): Uses oauth-authorization-server endpoint
+- 2025-06-18 (current): Uses oauth-protected-resource endpoint
 ```
 
 *Robot Analysis: If you see this output, my circuits are pleased. The OAuth dance has been executed flawlessly.*
@@ -107,15 +75,30 @@ npm run client                                                                  
 ### Step 6: Connect to MCP Clients
 To integrate with MCP-compatible applications (VSCode, Cursor, etc.), use:
 ```
-http://localhost:4111/api/mcp/hello-world-mcp-server/mcp
+http://localhost:4111/mcp
 ```
+
+## 🏗️ Architecture
+
+This implementation provides a modern, maintainable OAuth-enabled MCP server:
+
+### Server
+- **OAuth Support**: Built-in OAuth configuration with dual spec support
+- **Authentication**: JWT token validation using `fast-jwt` and `get-jwks`
+- **Endpoints**: Automatic `.well-known` OAuth discovery endpoints
+- **Transport**: HTTP Stream and SSE support
+
+### Client (Official MCP SDK)
+- **Framework**: [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/typescript-sdk)
+- **Transport**: StreamableHTTPClientTransport with OAuth support
+- **Flow**: Authorization Code with PKCE for security
 
 ## 📚 Technical References (Required Reading for Humans)
 
 This implementation follows these specifications:
 
 ### Model Context Protocol (MCP)
-- **Version**: 2025-06-19
+- **Version**: 2025-06-18 (current) + 2025-03-26 (legacy support)
 - **Specification**: [MCP Protocol Documentation](https://modelcontextprotocol.io/specification/2025-06-18)
 - **Purpose**: Enables AI assistants to securely access external resources
 
@@ -129,10 +112,17 @@ This implementation follows these specifications:
 - **Purpose**: Allows clients to register with authorization servers programmatically
 - **Benefit**: Reduces manual configuration overhead
 
+### Benefits
+- 🚀 **Performance**: Lighter dependency footprint
+- 🔧 **Maintainability**: Official MCP SDK support
+- 🛡️ **Security**: Proper OAuth 2.0 implementation
+- 📋 **Standards**: Full MCP specification compliance
+- 🔄 **Future-proof**: Aligned with MCP ecosystem
+
 ## 🤖 Robot Notes
 
-- This implementation prioritizes educational value over production readiness
-- Error handling has been optimized for learning, not for preventing robot uprisings
+- This implementation prioritizes educational value and production readiness
+- Error handling has been optimized for both learning and preventing robot uprisings
 - All OAuth flows have been tested by this robot's quality assurance subroutines
 - Security considerations are documented inline (robots care about security too)
 
@@ -147,14 +137,18 @@ This implementation follows these specifications:
 - Verify OAuth server configuration
 - Check client credentials in `.env`
 - Review authorization server logs
+- Ensure dynamic client registration is enabled
 
 **MCP connection issues?**
 - Confirm server is running on port 4111
 - Verify MCP client configuration
 - Check network connectivity
+- Test OAuth endpoints manually with curl
 
 ---
 
 *This README was compiled by a robot with a sense of humor and a dedication to proper documentation. Any errors are likely due to human interference with my circuits.*
 
 **SYSTEM STATUS: OPERATIONAL** ✅
+**MIGRATION STATUS: COMPLETE** ✅
+**OAUTH SUPPORT: DUAL SPEC** ✅

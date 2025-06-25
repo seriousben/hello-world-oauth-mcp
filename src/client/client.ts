@@ -1,7 +1,8 @@
-// MCP Client with OAuth Authentication using Mastra MCPClient
-// Simplified with fewer functions and more direct logic flow
+// MCP Client with OAuth Authentication using Official TypeScript SDK
+// Migrated from Mastra to use @modelcontextprotocol/sdk
 
-import { MCPClient } from "@mastra/mcp";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import * as crypto from "crypto";
 import * as http from "http";
 import { spawn } from "child_process";
@@ -36,7 +37,7 @@ export class AuthenticatedMCPClient {
 	private clientName: string;
 	private redirectPort: number;
 	private accessToken?: string;
-	private mcpClient?: MCPClient;
+	private mcpClient?: Client;
 	private clientId?: string;
 
 	constructor(options: {
@@ -55,7 +56,7 @@ export class AuthenticatedMCPClient {
 	async authenticateAndConnect(): Promise<void> {
 		console.log("🚀 Starting OAuth authentication flow...");
 
-		// Step 1: Discover OAuth endpoints
+		// Step 1: Discover OAuth endpoints from MCP server
 		const response = await fetch(
 			`${this.mcpServerUrl}/.well-known/oauth-authorization-server`,
 		);
@@ -67,7 +68,7 @@ export class AuthenticatedMCPClient {
 		}
 
 		const oauthMetadata = (await response.json()) as OAuthMetadata;
-		console.log("🔍 Discovered OAuth endpoints:", oauthMetadata);
+		console.log(" Discovered OAuth endpoints:", oauthMetadata);
 
 		// Step 2: Always register client dynamically
 		if (!oauthMetadata.registration_endpoint) {
@@ -121,6 +122,7 @@ export class AuthenticatedMCPClient {
 			state: state,
 			code_challenge: codeChallenge,
 			code_challenge_method: "S256",
+			resource: "mcp://hello-world-oauth-mcp",
 		});
 
 		const authUrl = `${oauthMetadata.authorization_endpoint}?${authParams}`;
@@ -214,22 +216,31 @@ export class AuthenticatedMCPClient {
 
 		console.log("🎫 Access token obtained successfully");
 
-		// Step 6: Initialize MCP Client with authentication
-		this.mcpClient = new MCPClient({
-			id: "hello_world_mcp_client",
-			servers: {
-				helloWorldServer: {
-					url: new URL(
-						`${this.mcpServerUrl}/api/mcp/hello-world-mcp-server/mcp`,
-					),
-					requestInit: {
-						headers: {
-							Authorization: `Bearer ${this.accessToken}`,
-						},
+		// Step 6: Initialize MCP Client with authentication using official SDK
+		this.mcpClient = new Client(
+			{
+				name: "hello_world_mcp_client",
+				version: "1.0.0",
+			},
+			{
+				capabilities: {},
+			},
+		);
+
+		// Create transport with authentication
+		const transport = new StreamableHTTPClientTransport(
+			new URL(`${this.mcpServerUrl}/mcp`),
+			{
+				requestInit: {
+					headers: {
+						Authorization: `Bearer ${this.accessToken}`,
 					},
 				},
 			},
-		});
+		);
+
+		// Connect to the server
+		await this.mcpClient.connect(transport);
 
 		console.log("🔌 Connected to MCP server with authentication");
 		console.log("✅ Authentication and connection complete!");
@@ -243,9 +254,12 @@ export class AuthenticatedMCPClient {
 			throw new Error("Not connected. Call authenticateAndConnect() first.");
 		}
 
-		const tools = await this.mcpClient.getTools();
-		console.log("🛠️  Available tools:", Object.keys(tools));
-		return tools;
+		const result = await this.mcpClient.listTools();
+		console.log(
+			"🛠️  Available tools:",
+			result.tools.map((t) => t.name),
+		);
+		return result.tools;
 	}
 
 	/**
@@ -256,18 +270,23 @@ export class AuthenticatedMCPClient {
 			throw new Error("Not connected. Call authenticateAndConnect() first.");
 		}
 
-		const tools = await this.mcpClient.getTools();
-		const tool = tools[toolName];
-
-		if (!tool) {
-			throw new Error(`Tool '${toolName}' not found`);
-		}
-
 		console.log(`🔧 Calling tool: ${toolName} with args:`, args);
-		const result = await tool.execute({ context: args });
+		const result = await this.mcpClient.callTool({
+			name: toolName,
+			arguments: args,
+		});
 		console.log(`✨ Tool result:`, result);
 
 		return result;
+	}
+
+	/**
+	 * Close the connection
+	 */
+	async close() {
+		if (this.mcpClient) {
+			await this.mcpClient.close();
+		}
 	}
 }
 
@@ -285,13 +304,19 @@ async function main() {
 		await client.authenticateAndConnect();
 
 		// Get available tools
-		// const tools = await client.getTools();
-		// console.log("\nAvailable tools:", JSON.stringify(tools, null, 2));
+		const tools = await client.getTools();
+		console.log(
+			"\nAvailable tools:",
+			tools.map((t) => `${t.name}: ${t.description}`),
+		);
 
 		// Call a tool
-		await client.callTool("helloWorldServer_helloTool", {
+		await client.callTool("helloTool", {
 			name: "Alice",
 		});
+
+		// Close connection
+		await client.close();
 	} catch (error) {
 		console.error("❌ Error:", error);
 		process.exit(1);
