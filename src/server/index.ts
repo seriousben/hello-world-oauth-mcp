@@ -161,6 +161,7 @@ const server = new FastMCP({
 			});
 			const verifier = createVerifier({
 				allowedIss: [AUTH_ISSUER],
+				allowedAud: "mcp://hello-world-mcp-server",
 				key: publicKey,
 				algorithms: ["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"],
 			});
